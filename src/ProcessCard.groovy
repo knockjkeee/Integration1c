@@ -82,7 +82,7 @@ class CardPacket {
     @JsonProperty("Processes")
     List<Processes> processes
 
-    List<PCardReq> Card
+    PCardReq Card
 
 }
 
@@ -296,7 +296,7 @@ class PRespCard {
  *  Подключение с отключенным SSL сертификатом
  */
 
-private  void prepareConnect() {
+private void prepareConnect() {
     def sc = SSLContext.getInstance("SSL")
     def trustAll = [getAcceptedIssuers: {}, checkClientTrusted: { a, b -> }, checkServerTrusted: { a, b -> }]
     sc.init(null, [trustAll as X509TrustManager] as TrustManager[], new SecureRandom())
@@ -309,7 +309,7 @@ private  void prepareConnect() {
  *  Подготовка POST запроса по http
  */
 
-private  def prepareRequestPOST(HttpURLConnection connection, String data) {
+private def prepareRequestPOST(HttpURLConnection connection, String data) {
     byte[] postData = data.getBytes(Charset.forName("utf-8"))
     connection.setDoOutput(true)
     connection.setInstanceFollowRedirects(false)
@@ -328,7 +328,7 @@ private  def prepareRequestPOST(HttpURLConnection connection, String data) {
  *  Обьект в json
  */
 
-private  String objToJson(Object obj) {
+private String objToJson(Object obj) {
     return new ObjectMapper().writer().writeValueAsString(obj);
 }
 
@@ -354,18 +354,23 @@ def addFilesToRequest(ArrayList<Files> files, obj) {
  *  Выгрузка данных из NSD
  */
 
-private  ProcessCardReq prepareRequestToSed() {
+private ProcessCardReq prepareRequestToSed() {
     //todo prepare data to SED
 
     def fields = new Fields()
-    fields.setSubject("data!!!!")
-    // Акт технического осмотра по заявке todo №заявки в NSD от Дата создания заявки в NSD”
+    fields.setSubject("Акт технического осмотра по заявке " + subject .....+" от " subject ....)
+    // todo  Акт технического осмотра по заявке №заявки в NSD от Дата создания заявки в NSD” !!! УТОЧНИТЬ
     def docComInfo = new DocumentCommonInfo()
     docComInfo.setFields(fields)
 
+    //выгрузка файлов
     List<Files> files = new ArrayList<>()
-    List.of(subject.dockpack).each { it ->
-        addFilesToRequest(files, it)
+
+    def filesData = utils.files(subject)
+    if (filesData) {
+        filesData.each { it ->
+            addFilesToRequest(files, it)
+        }
     }
 
     def section = new Sections()
@@ -376,31 +381,25 @@ private  ProcessCardReq prepareRequestToSed() {
 //        pReqCard.setId()  todo null
 //        pReqCard.setExternalID()  todo null
 //        pReqCard.setTypeID()  todo null
-    pReqCard.setDocTypeID(UUID.randomUUID().toString()) //todo for test
+    pReqCard.setDocTypeID(UUID.randomUUID().toString())
+    //todo for test Передавать значение = Акт технического осмотра !!! УТОЧНИТЬ
     pReqCard.setSections(section)
 
     def process = new Processes()
-    process.setProcessID(UUID.randomUUID().toString())
+    process.setProcessID(UUID.randomUUID().toString()) //todo for test
 //    process.setStageTemplateID()  todo null
 //    process.setRoleID() todo null
 //    process.setFdCustomParticipants() todo null
 
     def cardPackets = new CardPacket()
     cardPackets.setMethod(0)
-    cardPackets.setProcesses(List.of(process)) //todo уточнить обьемы
-    cardPackets.setCard(List.of(pReqCard)) //todo уточнить обьемы
+    cardPackets.setProcesses(List.of(process)) //todo !!!!уточнить структуру в дальнейшем
+    cardPackets.setCard(pReqCard)
 
     def obj = new ProcessCardReq()
-
-    def uuidMain = UUID.randomUUID().toString()
-    Map<Object, Object> updateData = new HashMap<>()
-    updateData.put("RequestID", uuidMain) //todo check
-    utils.edit(subject.UUID, updateData)
-
-    obj.setRequestID(uuidMain)
+    obj.setRequestID(UUID.randomUUID().toString())
     obj.setCardPackets(List.of(cardPackets))
     return obj
-
 }
 
 
@@ -408,65 +407,46 @@ private  ProcessCardReq prepareRequestToSed() {
  *  Загрузка данных в NSD
  */
 
-private  boolean loadResponseToNSD(ProcessCardResp response) {
+private boolean loadResponseToNSD(ProcessCardResp response) {
 
-    def obj = utils.find('???', [RequestID: response.getRequestID()])[0] //todo change naming obj
+    def obj = subject
 
     if (obj == null) {
         logger.info("${LOG_PREFIX} Обьект для изменения не найден, RequestID ${response.getRequestID()}")
         return false
     }
 
-    Map<Object, Object> updateData = new HashMap<>()
-    response.getEvents().each { it ->
-        updateData.put("EventType", it.getEventType())
-        updateData.put("Message", it.getMessage())
-        updateData.put("TimeStamp", it.getTimeStamp())
-        updateData.put("StackTrace", it.getStackTrace())
-        updateData.put("obj", obj.UUID) //todo check
-        def event
-        def closure = {
-            utils.create('????', updateData); //todo get id event
-        }
-        event = api.tx.call(closure)
-        String log
-        if (event != null) {
-            log = "${LOG_PREFIX} Обьект Event создан, ID записи: ${event.UUID}"
-        } else {
-            log = "${LOG_PREFIX} Обьект Event не создан, ошибка сохранения"
-        }
-        logger.info(log)
-        updateData.clear()
-    }
+    boolean isFail = false;
+    def cards = response.getCards()
 
-    response.getCards().each { it ->
-        updateData.put("ID", it.getID())
-        updateData.put("ExternalID", it.getExternalID())
-        updateData.put("Barcode", it.getBarcode())
-        updateData.put("obj", obj.UUID) //todo check
+    response.getEvents().eachWithIndex { event, index ->
+        String log = "${LOG_PREFIX} ${event.getTimeStamp()}, Messsage - ${event.getMessage()}, StackTrace - ${event.getStackTrace()}"
 
-        def card
-        def closure = {
-            utils.create('????', updateData); //todo get id card
-        }
-        card = api.tx.call(closure)
-        String log
-        if (card != null) {
-            log = "${LOG_PREFIX} Обьект Card создан, ID записи: ${card.UUID}"
+        if (event.getEventType() == 0) {
+            logger.error(log)
+            isFail = true
         } else {
-            log = "${LOG_PREFIX} Обьект Card не создан, ошибка сохранения"
+            def prCard = cards.get(index)
+            Map<Object, Object> updateData = new HashMap<>()
+            updateData.put("docActID", prCard.getID())
+            updateData.put("barcode", prCard.getBarcode())
+            def closure = {
+                utils.edit(obj.UUID, updateData)
+            }
+            api.tx.call(closure)
+            log = "${LOG_PREFIX} Обьект Dock обновлен, ID записи: ${prCard.getExternalID()}"
+            logger.info(log)
+            isFail = false
         }
-        logger.info(log)
-        updateData.clear()
     }
-    return true;
+    return !isFail;
 }
 
 
 prepareConnect()
 def connect = (HttpURLConnection) new URL(URL).openConnection()
-String data = objToJson(ProcessCardReq.prapareStaticData()) //todo test
-//String data = objToJson(prepareRequestToSed()) todo main object
+//String data = objToJson(ProcessCardReq.prapareStaticData()) //todo test
+String data = objToJson(prepareRequestToSed()) //todo main object
 prepareRequestPOST(connect, data)
 
 if (connect.responseCode == 200) {
