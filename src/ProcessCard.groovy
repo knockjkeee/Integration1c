@@ -9,11 +9,15 @@ import groovy.json.JsonSlurperClassic
 import javax.net.ssl.*
 import java.nio.charset.Charset
 import java.security.SecureRandom
+import java.time.Instant
 
 @Field final JsonSlurperClassic json = new JsonSlurperClassic()
 @Field final String LOG_PREFIX = "[INTEGRATION: SED] "
 String URL = 'http://localhost/exec-post/Integration/ProcessCards'
 
+/**
+ * ====================  REQUEST OBJECT ====================
+ */
 
 @JsonPropertyOrder(['RequestID', 'CardPackets'])
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -22,205 +26,357 @@ String URL = 'http://localhost/exec-post/Integration/ProcessCards'
  */
 class ProcessCardReq {
 
+    /**
+     * ID запроса
+     * Идентификатор запроса. NSD генерирует и передает для синхронизации пакета запроса и ответа
+     */
     @JsonProperty("RequestID")
     String requestID
 
+    /**
+     * Массив данных Документы
+     */
     @JsonProperty("CardPackets")
     List<CardPacket> cardPackets
 
+
+    /**
+     * Тестовый метод заполнения данных
+     * @return
+     */
     static ProcessCardReq prapareStaticData() {
-        def fields = new Fields()
-        fields.setSubject("Акт технического осмотра по заявке REQ-128 от 20.11.2023")
-
-        def documentCommonInfo = new DocumentCommonInfo()
-        documentCommonInfo.setFields(fields)
-
-        def file = new Files()
-        file.setName("Tech_act.docx")
-        file.setMethod(0)
-        file.setContent("UEsDBBQACAAIAICEH1cAAAAAAAAAA==")
-//        file.setCategoryID()
-
-        def section = new Sections()
-        section.setDocumentCommonInfo(documentCommonInfo)
-        section.setFiles(List.of(file))
-
-        def pReqCard = new PCardReq()
-//        pReqCard.setId()
-//        pReqCard.setExternalID()
-//        pReqCard.setTypeID()
-        pReqCard.setDocTypeID("0604d711-de06-4686-8684-0ca8388f913f")
-        pReqCard.setSections(section)
-
-        def process = new Processes()
-        process.setProcessID("3ab5296a-6286-4080-a13b-3d05d889d8ee")
-
-        def cardPackets = new CardPacket()
-        cardPackets.setMethod(0)
-        cardPackets.setProcesses(List.of(process))
-        cardPackets.setCard(List.of(pReqCard))
-
-        def obj = new ProcessCardReq()
-        obj.setRequestID("d890396-c00e-4016-96e3-c818f75ab93e")
-
-        obj.setCardPackets(List.of(cardPackets))
-        return obj
-
+//        def fields = new FieldsDocumentCommonInfo()
+//        fields.setSubject("Акт технического осмотра по заявке REQ-128 от 20.11.2023")
+//
+//        def documentCommonInfo = new DocumentCommonInfo()
+//        documentCommonInfo.setFields(fields)
+//
+//        def file = new Files()
+//        file.setName("Tech_act.docx")
+//        file.setMethod(0)
+//        file.setContent("UEsDBBQACAAIAICEH1cAAAAAAAAAA==")
+////        file.setCategoryID()
+//
+//        def section = new Sections()
+//        section.setDocumentCommonInfo(documentCommonInfo)
+//        section.setFiles(List.of(file))
+//
+//        def pReqCard = new PCardReq()
+////        pReqCard.setId()
+////        pReqCard.setExternalID()
+////        pReqCard.setTypeID()
+//        pReqCard.setDocTypeID("0604d711-de06-4686-8684-0ca8388f913f")
+//        pReqCard.setSections(section)
+//
+//        def process = new Processes()
+//        process.setProcessID("3ab5296a-6286-4080-a13b-3d05d889d8ee")
+//
+//        def cardPackets = new CardPacket()
+//        cardPackets.setMethod(0)
+//        cardPackets.setProcesses(List.of(process))
+//        cardPackets.setCard(List.of(pReqCard))
+//
+//        def obj = new ProcessCardReq()
+//        obj.setRequestID("d890396-c00e-4016-96e3-c818f75ab93e")
+//
+//        obj.setCardPackets(List.of(cardPackets))
+//        return obj
+        return null
     }
 }
 
-@JsonPropertyOrder(['method', 'Processes', 'Card'])
+@JsonPropertyOrder(['Method', 'Processes', 'Card'])
 @JsonIgnoreProperties(ignoreUnknown = true)
 /*
  *    Массив данных Документы
  */
 class CardPacket {
 
-    @JsonProperty("method")
+    /**
+     * Метод обработки
+     * Метод обработки документа. Передавать 0 (создать)
+     */
+    @JsonProperty("Method")
     int method
 
+    /**
+     * Информация о запускаемых процессах
+     * ID запускаемого процесса
+     * Процесс для запуска документа на согласование
+     */
     @JsonProperty("Processes")
-    List<Processes> processes
+    List<String> processes
 
-    PCardReq Card
-
-}
-
-@JsonPropertyOrder(['ProcessID', 'FdCustomParticipants', 'StageTemplateID', 'RoleID'])
-@JsonIgnoreProperties(ignoreUnknown = true)
-/*
- *    Информация о запускаемых процессах
- */
-class Processes {
-
-    @JsonProperty("ProcessID")
-    String processID
-
-    @JsonProperty("FdCustomParticipants")
-    List<CustomParticipants> fdCustomParticipants
-
-    @JsonProperty("StageTemplateID")
-    String stageTemplateID
-
-    @JsonProperty("RoleID")
-    String roleID
-
-}
-
-@JsonPropertyOrder(['Table', 'Rows',])
-@JsonIgnoreProperties(ignoreUnknown = true)
-/*
- *   Коллекционная секция, в которую заполняются участники для запускаемых процессов по карточке
- */
-class CustomParticipants {
-
-    @JsonProperty("Table")
-    int table
-
-    @JsonProperty("Rows")
-    List<String> rows
+    /**
+     * Информация о карточке документа
+     */
+    @JsonProperty("Card")
+    PCardReq card
 
 }
 
 
-@JsonPropertyOrder(['ID', 'ExternalID', 'TypeID', 'DocTypeID', 'Sections'])
+@JsonPropertyOrder(['ExternalID', 'DocTypeID', 'Files', 'Sections'])
 @JsonIgnoreProperties(ignoreUnknown = true)
-/*
- *   Информация о карточке документа
+/**
+ * Информация о карточке документа
  */
 class PCardReq {
 
-    @JsonProperty("ID")
-    String id
-
+    /**
+     * Внешний ID
+     * Передавать ID МТР, по которому формируется Акт осмотра
+     */
     @JsonProperty("ExternalID")
-    String externalID
+    String externalID //+
 
-    @JsonProperty("TypeID")
-    String typeID
-
+    /**
+     * ID типа документа
+     * Передавать значение = Акт технического осмотра
+     */
     @JsonProperty("DocTypeID")
-    String docTypeID
+    String docTypeID //+
 
-    @JsonProperty("Sections")
-    Sections sections
-
-}
-
-
-@JsonPropertyOrder(['DocumentCommonInfo', 'Files',])
-@JsonIgnoreProperties(ignoreUnknown = true)
-/*
- *    Секции карточки документа (атрибуты карточки).
- */
-class Sections {
-
-    @JsonProperty("DocumentCommonInfo")
-    DocumentCommonInfo documentCommonInfo
-
+    /**
+     * Файлы документа
+     */
     @JsonProperty("Files")
     List<Files> files
 
-}
-
-
-@JsonPropertyOrder(['Fields'])
-@JsonIgnoreProperties(ignoreUnknown = true)
-/*
- *    Основная информация
- */
-class DocumentCommonInfo {
-
-    @JsonProperty("Fields")
-    Fields fields
-
-}
-
-@JsonPropertyOrder(['Subject'])
-@JsonIgnoreProperties(ignoreUnknown = true)
-/*
- *    Структура
- */
-class Fields {
-
-    @JsonProperty("Subject")
-    /*
-    Тема документа. Передавать значение = Акт технического осмотра по заявке Номер заявки от Дата создания заявки
+    /**
+     * Секции карточки документа
      */
-    String subject
+    @JsonProperty("Sections")
+    Sections sections
 }
 
 
-@JsonPropertyOrder(['Method', 'Name', 'CategoryID', 'Content'])
+@JsonPropertyOrder(['Method', 'ID', 'Name', 'CategoryID', 'Content'])
 @JsonIgnoreProperties(ignoreUnknown = true)
 /*
  *    Файлы документа
  */
 class Files {
 
+    /**
+     * Метод обработки файла
+     * Метод обработки файла. Передавать 0 (создать)
+     */
     @JsonProperty("Method")
     int method
 
+    /**
+     * ID файла
+     * Идентификатор файла. NSD генерирует и передает для синхронизации разделов Files и GptFiles.
+     * Прописывается также в п.6.3.2
+     */
+    @JsonProperty("ID")
+    String id
+
+    /**
+     * Наименование файла
+     * Имя файла и его расширение
+     */
     @JsonProperty("Name")
     String name
 
+    /**
+     * Категория файла
+     * Передавать значение = Файлы на подпись
+     */
     @JsonProperty("CategoryID")
     String categoryID
 
+    /**
+     * Контент файла
+     * Сериализованный бинарный контент файла в Base64 c кодировкой UTF-8
+     */
     @JsonProperty("Content")
     String content
 }
 
 
+@JsonPropertyOrder(['DocumentCommonInfo', 'GptDocumentCommonInfo', 'GptFiles'])
+@JsonIgnoreProperties(ignoreUnknown = true)
+/**
+ * Секции карточки документа (атрибуты карточки).
+ * Может включать секции двух типов: строковые и коллекционные.
+ * В строковых секциях атрибуты содержаться в структуре Fields, в коллекционных в коллекции Rows (набор строк)
+ */
+class Sections {
+
+    /**
+     * Основная информация
+     */
+    @JsonProperty("DocumentCommonInfo")
+    DocumentCommonInfo documentCommonInfo
+
+    /**
+     * Информация по документу
+     */
+    @JsonProperty("GptDocumentCommonInfo")
+    GptDocumentCommonInfo gptDocumentCommonInfo
+
+    /**
+     * Набор атрибутов для передачи типа вложения к файлу - массив
+     */
+    @JsonProperty("GptFiles")
+    GptFiles gptFiles
+
+}
+
+
+@JsonPropertyOrder(['Fields'])
+@JsonIgnoreProperties(ignoreUnknown = true)
+/**
+ * Основная информация
+ */
+class DocumentCommonInfo {
+
+    /**
+     * Структура полей
+     */
+    @JsonProperty("Fields")
+    FieldsDocumentCommonInfo fields
+
+}
+
+
+@JsonPropertyOrder(['Fields'])
+@JsonIgnoreProperties(ignoreUnknown = true)
+/**
+ * Информация по документу
+ */
+class GptDocumentCommonInfo {
+
+    /**
+     * Структура полей
+     */
+    @JsonProperty("Fields")
+    FieldsGptDocumentCommonInfo fields
+}
+
+
+@JsonPropertyOrder(['Table', 'Rows'])
+@JsonIgnoreProperties(ignoreUnknown = true)
+/**
+ * Набор атрибутов для передачи типа вложения к файлу - массив
+ */
+class GptFiles{
+
+    /**
+     * Признак, что секция является коллекционной. Число (от 0 до 2)
+     */
+    @JsonProperty("Table")
+    int table;
+
+    /**
+     * Структура. Коллекционная секция
+     */
+    @JsonProperty("Rows")
+    List<RowsFieldsGptFiles> rows;
+}
+
+
+@JsonPropertyOrder(['AuthorID', 'DocDate', 'Subject'])
+@JsonIgnoreProperties(ignoreUnknown = true)
+/**
+ *  Структура для DocumentCommonInfo
+ */
+class FieldsDocumentCommonInfo {
+
+    /**
+     * Автор
+     * Автор документа.
+     * Передавать значение ID сотрудника в 1C, который инициировал создание Акта осмотра оборудования
+     */
+    @JsonProperty("AuthorID")
+    String authorID
+
+    /**
+     * Дата документа
+     * Передавать значение текущей даты
+     */
+    @JsonProperty("DocDate")
+    Instant docDate
+
+    /**
+     * Тема
+     * Тема документа.
+     * Передавать значение = Акт технического осмотра по заявке Номер заявки от Дата создания заявки
+     */
+    @JsonProperty("Subject")
+    String subject
+
+}
+
+
+@JsonPropertyOrder(['MediaTypeID', 'IncomingDate'])
+@JsonIgnoreProperties(ignoreUnknown = true)
+/**
+ *  Структура для GptDocumentCommonInfo
+ */
+class FieldsGptDocumentCommonInfo {
+
+    /**
+     * Носитель оригинала
+     * Передавать значение = Электронный
+     */
+    @JsonProperty("MediaTypeID")
+    Instant mediaTypeID
+
+    /**
+     * Входящая дата
+     * Передавать значение текущей даты
+     */
+    @JsonProperty("IncomingDate")
+    String incomingDate
+
+}
+
+
+@JsonPropertyOrder(['AttachmentTypeID', 'FileRowID'])
+@JsonIgnoreProperties(ignoreUnknown = true)
+/**
+ * Структура. Коллекционная секция
+ */
+class RowsFieldsGptFiles{
+
+    /**
+     * Передавать значение = Проект
+     */
+    @JsonProperty("AttachmentTypeID")
+    String attachmentTypeID;
+
+    /**
+     * Идентификатор файла. NSD генерирует и передает для синхронизации разделов Files и GptFiles.
+     * Прописывается также в п.5.2
+     */
+    @JsonProperty("ID")
+    String ID
+}
+
+
+/**
+ * ====================  RESPONSE OBJECT ====================
+ */
+
 @JsonPropertyOrder(['RequestID', 'Events', 'Cards'])
 @JsonIgnoreProperties(ignoreUnknown = true)
-/*
- *    Атрибуты ответа карточки документа от СЭД:
+/**
+ * Атрибуты ответа карточки документа от СЭД:
  */
 class ProcessCardResp {
 
+    /**
+     * ID запроса
+     * ID запроса, на который отправляется данный ответ
+     */
     String RequestID
 
+    /**
+     * Структура. Коллекция событий по текущему запросу
+     */
     List<Event> Events
 
     List<PRespCard> Cards
@@ -261,17 +417,35 @@ class ProcessCardResp {
 
 @JsonPropertyOrder(['EventType', 'TimeStamp', 'Message', 'StackTrace'])
 @JsonIgnoreProperties(ignoreUnknown = true)
-/*
- *     Структура. Коллекция событий по текущему запросу
+/**
+ * Структура. Коллекция событий по текущему запросу
  */
 class Event {
 
+    /**
+     * Тип события
+     * 0 = Error = Ошибка. Возвращается в случае критической ошибки, при которой дальнейшая обработка запроса невозможна.
+     * 1 = Warn = Предупреждение. Возвращается при незначительных ошибках, не препятствующих обработке запроса.
+     * 2 = Info = Информация. Общая информация о ходе выполнения запроса.
+     */
     int EventType
 
-    String TimeStamp
+    /**
+     * Дата, время
+     * Момент времени получения запроса
+     */
+    Instant TimeStamp
 
+    /**
+     * Текст ошибки
+     * В случае ошибки записывается текст ошибки
+     */
     String Message
 
+    /**
+     * Трассировка вызова
+     * Техническая информация о трассировке ошибки. Заполняется только с типом события Error (0)
+     */
     String StackTrace
 
 }
@@ -284,18 +458,28 @@ class Event {
  */
 class PRespCard {
 
+    /**
+     * ID карточки в СЭД
+     */
     String ID
 
+    /**
+     * ID карточки внешней ИС
+     * Возвращается, если поле заполнено в карточке
+     */
     String ExternalID
 
+    /**
+     * Штрих-код карточки документа
+     * При создании карточки, СЭД генерирует штрих-код документа и возвращает его в запросе
+     */
     String Barcode
 }
 
 
-/*
- *  Подключение с отключенным SSL сертификатом
+/**
+ * Подключение с отключенным SSL сертификатом
  */
-
 private void prepareConnect() {
     def sc = SSLContext.getInstance("SSL")
     def trustAll = [getAcceptedIssuers: {}, checkClientTrusted: { a, b -> }, checkServerTrusted: { a, b -> }]
@@ -305,10 +489,9 @@ private void prepareConnect() {
     HttpsURLConnection.setDefaultHostnameVerifier(hostnameVerifier)
 }
 
-/*
- *  Подготовка POST запроса по http
+/**
+ * Подготовка POST запроса по http
  */
-
 private def prepareRequestPOST(HttpURLConnection connection, String data) {
     byte[] postData = data.getBytes(Charset.forName("utf-8"))
     connection.setDoOutput(true)
@@ -324,10 +507,9 @@ private def prepareRequestPOST(HttpURLConnection connection, String data) {
 }
 
 
-/*
- *  Обьект в json
+/**
+ * Обьект в json
  */
-
 private String objToJson(Object obj) {
     return new ObjectMapper().writer().writeValueAsString(obj);
 }
@@ -350,14 +532,13 @@ def addFilesToRequest(ArrayList<Files> files, obj) {
 }
 
 
-/*
- *  Выгрузка данных из NSD
+/**
+ * Выгрузка данных из NSD
  */
-
 private ProcessCardReq prepareRequestToSed() {
     //todo prepare data to SED
 
-    def fields = new Fields()
+    def fields = new FieldsDocumentCommonInfo()
     fields.setSubject("Акт технического осмотра по заявке " + subject .....+" от " subject ....)
     // todo  Акт технического осмотра по заявке №заявки в NSD от Дата создания заявки в NSD” !!! УТОЧНИТЬ
     def docComInfo = new DocumentCommonInfo()
@@ -403,10 +584,9 @@ private ProcessCardReq prepareRequestToSed() {
 }
 
 
-/*
- *  Загрузка данных в NSD
+/**
+ * Загрузка данных в NSD
  */
-
 private boolean loadResponseToNSD(ProcessCardResp response) {
 
     def obj = subject
@@ -442,6 +622,10 @@ private boolean loadResponseToNSD(ProcessCardResp response) {
     return !isFail;
 }
 
+
+/**
+ * ====================  ENTRY POINT  ====================
+ */
 
 prepareConnect()
 def connect = (HttpURLConnection) new URL(URL).openConnection()
