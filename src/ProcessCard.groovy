@@ -10,10 +10,19 @@ import javax.net.ssl.*
 import java.nio.charset.Charset
 import java.security.SecureRandom
 import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @Field final JsonSlurperClassic json = new JsonSlurperClassic()
 @Field final String LOG_PREFIX = "[INTEGRATION: SED] "
-String URL = 'http://localhost/exec-post/Integration/ProcessCards'
+
+String HOST_API = "http://localhost/exec-post/"
+String HOST_DOCK = "https://tessa-test/"
+String METHOD = 'Integration/ProcessCards'
+
+String URL = HOST_API + METHOD
+//String URL = "http://localhost/exec-post/Integration/ProcessCards"
+
 
 /**
  * ====================  REQUEST OBJECT ====================
@@ -44,48 +53,90 @@ class ProcessCardReq {
      * Тестовый метод заполнения данных
      * @return
      */
-    static ProcessCardReq prapareStaticData() {
-//        def fields = new FieldsDocumentCommonInfo()
-//        fields.setSubject("Акт технического осмотра по заявке REQ-128 от 20.11.2023")
-//
-//        def documentCommonInfo = new DocumentCommonInfo()
-//        documentCommonInfo.setFields(fields)
-//
-//        def file = new Files()
-//        file.setName("Tech_act.docx")
-//        file.setMethod(0)
-//        file.setContent("UEsDBBQACAAIAICEH1cAAAAAAAAAA==")
-////        file.setCategoryID()
-//
-//        def section = new Sections()
-//        section.setDocumentCommonInfo(documentCommonInfo)
-//        section.setFiles(List.of(file))
-//
-//        def pReqCard = new PCardReq()
-////        pReqCard.setId()
-////        pReqCard.setExternalID()
-////        pReqCard.setTypeID()
-//        pReqCard.setDocTypeID("0604d711-de06-4686-8684-0ca8388f913f")
-//        pReqCard.setSections(section)
-//
-//        def process = new Processes()
-//        process.setProcessID("3ab5296a-6286-4080-a13b-3d05d889d8ee")
-//
-//        def cardPackets = new CardPacket()
-//        cardPackets.setMethod(0)
-//        cardPackets.setProcesses(List.of(process))
-//        cardPackets.setCard(List.of(pReqCard))
-//
-//        def obj = new ProcessCardReq()
-//        obj.setRequestID("d890396-c00e-4016-96e3-c818f75ab93e")
-//
-//        obj.setCardPackets(List.of(cardPackets))
-//        return obj
-        return null
+    static ProcessCardReq prepareStaticData() {
+
+        def cardReq = new ProcessCardReq()
+        cardReq.setRequestID(UUID.randomUUID().toString())
+
+        def cardPacket = new CardPacket()
+        cardPacket.setMethod(0)
+        cardPacket.setProcesses(List.of(UUID.randomUUID().toString())) //todo random?!?
+
+        def pCardReq = new PCardReq()
+        pCardReq.setExternalID("ID МТР (ci.idHolder)") //todo (ci.idHolder)
+        pCardReq.setDocTypeID(UUID.randomUUID().toString())
+        // todo random?? "Передавать значение = Акт технического осмотра"
+
+        // ====  TEST FILES ====
+        def files = new Files()
+        files.setMethod(0)
+        files.setId(UUID.randomUUID().toString()) //todo file.UUID
+        files.setName("Tech_act.docx")
+        files.setCategoryID("Файлы на подпись")
+        files.setContent("UEsDBBQACAAIAICEH1cAAAAAAAAAA==")
+
+        def prepareFiles = List.of(files)
+        pCardReq.setFiles(prepareFiles) //add Files card //todo random?!?
+
+        def section = new Sections()
+
+        def documentCommonInfo = new DocumentCommonInfo()
+        def fieldsDocumentCommonInfo = new FieldsDocumentCommonInfo()
+        fieldsDocumentCommonInfo.setAuthorID(UUID.toString().toString()) // todo Employee. idHolder
+        def docDate = formatInstantNowToString(Instant.now(), true)
+        fieldsDocumentCommonInfo.setDocDate(docDate)
+        fieldsDocumentCommonInfo.setSubject(String.format("Акт технического осмотра по заявке %s от %s", 123, docDate))
+        //todo номер заявки
+        documentCommonInfo.setFields(fieldsDocumentCommonInfo)
+
+        def gptDocumentCommonInfo = new GptDocumentCommonInfo()
+        def fieldsGptDocumentCommonInfo = new FieldsGptDocumentCommonInfo()
+        fieldsGptDocumentCommonInfo.setMediaTypeID(UUID.randomUUID().toString())
+        // todo random?? "Передавать значение = Электронный"
+        fieldsGptDocumentCommonInfo.setIncomingDate(docDate)
+        gptDocumentCommonInfo.setFields(fieldsGptDocumentCommonInfo)
+
+        GptFiles gptFiles = new GptFiles()
+        gptFiles.setTable(1) //todo collections
+
+        def collect = prepareFiles.collect { it ->
+                RowsFieldsGptFiles rowsFieldsGptFiles = new RowsFieldsGptFiles()
+                rowsFieldsGptFiles.setAttachmentTypeID(UUID.randomUUID().toString())
+                //todo random?? "Передавать значение = Проект"
+                rowsFieldsGptFiles.setID(it.getId())
+                return rowsFieldsGptFiles
+        }
+
+        if (collect.size() > 0) {
+            gptFiles.setRows(collect)
+            gptFiles.setTable(1)
+        } else {
+            gptFiles.setTable(0)
+        }
+
+        section.setDocumentCommonInfo(documentCommonInfo) // add  DocumentCommonInfo
+        section.setGptDocumentCommonInfo(gptDocumentCommonInfo) // add  GptDocumentCommonInfo
+        section.setGptFiles(gptFiles) // add  GptFiles
+        pCardReq.setSections(section) // add Section
+
+        cardPacket.setCard(pCardReq) //add PCardReq card
+        cardReq.setCardPackets(List.of(cardPacket)) //add List<CardPacket> cardPackets
+
+        return cardReq
+    }
+
+    /**
+     * Форматирования Instant в Строку для Теста
+     */
+    private static String formatInstantNowToString(Instant instant, boolean onlyDate) {
+        String PATTERN_FORMAT = "yyyy-MM-dd";
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(PATTERN_FORMAT).withZone(ZoneId.systemDefault());
+
+        return onlyDate ? formatter.format(instant) + "T" : instant.toString();
     }
 }
 
-@JsonPropertyOrder(['Method', 'Processes', 'Card'])
+@JsonPropertyOrder(['METHOD', 'Processes', 'Card'])
 @JsonIgnoreProperties(ignoreUnknown = true)
 /*
  *    Массив данных Документы
@@ -96,7 +147,7 @@ class CardPacket {
      * Метод обработки
      * Метод обработки документа. Передавать 0 (создать)
      */
-    @JsonProperty("Method")
+    @JsonProperty("METHOD")
     int method
 
     /**
@@ -151,7 +202,7 @@ class PCardReq {
 }
 
 
-@JsonPropertyOrder(['Method', 'ID', 'Name', 'CategoryID', 'Content'])
+@JsonPropertyOrder(['METHOD', 'ID', 'Name', 'CategoryID', 'Content'])
 @JsonIgnoreProperties(ignoreUnknown = true)
 /*
  *    Файлы документа
@@ -162,7 +213,7 @@ class Files {
      * Метод обработки файла
      * Метод обработки файла. Передавать 0 (создать)
      */
-    @JsonProperty("Method")
+    @JsonProperty("METHOD")
     int method
 
     /**
@@ -262,7 +313,7 @@ class GptDocumentCommonInfo {
 /**
  * Набор атрибутов для передачи типа вложения к файлу - массив
  */
-class GptFiles{
+class GptFiles {
 
     /**
      * Признак, что секция является коллекционной. Число (от 0 до 2)
@@ -298,7 +349,7 @@ class FieldsDocumentCommonInfo {
      * Передавать значение текущей даты
      */
     @JsonProperty("DocDate")
-    Instant docDate
+    String docDate
 
     /**
      * Тема
@@ -323,7 +374,7 @@ class FieldsGptDocumentCommonInfo {
      * Передавать значение = Электронный
      */
     @JsonProperty("MediaTypeID")
-    Instant mediaTypeID
+    String mediaTypeID
 
     /**
      * Входящая дата
@@ -340,7 +391,7 @@ class FieldsGptDocumentCommonInfo {
 /**
  * Структура. Коллекционная секция
  */
-class RowsFieldsGptFiles{
+class RowsFieldsGptFiles {
 
     /**
      * Передавать значение = Проект
@@ -434,7 +485,7 @@ class Event {
      * Дата, время
      * Момент времени получения запроса
      */
-    Instant TimeStamp
+    String TimeStamp
 
     /**
      * Текст ошибки
@@ -454,7 +505,7 @@ class Event {
 @JsonPropertyOrder(['ID', 'ExternalID', 'Barcode'])
 @JsonIgnoreProperties(ignoreUnknown = true)
 /*
- *    Обьект ответа
+ *    Объект ответа
  */
 class PRespCard {
 
@@ -524,8 +575,9 @@ def addFilesToRequest(ArrayList<Files> files, obj) {
         def encode = Base64.encoder.encode(data)
         def content = new String(encode)
         Files file = new Files()
-        file.setContent(content)
+        file.setId(obj.UUID)
         file.setName(obj.title)
+        file.setContent(content)
         file.setMethod(0)
         files.add(file)
     }
@@ -536,16 +588,21 @@ def addFilesToRequest(ArrayList<Files> files, obj) {
  * Выгрузка данных из NSD
  */
 private ProcessCardReq prepareRequestToSed() {
-    //todo prepare data to SED
 
-    def fields = new FieldsDocumentCommonInfo()
-    fields.setSubject("Акт технического осмотра по заявке " + subject .....+" от " subject ....)
-    // todo  Акт технического осмотра по заявке №заявки в NSD от Дата создания заявки в NSD” !!! УТОЧНИТЬ
-    def docComInfo = new DocumentCommonInfo()
-    docComInfo.setFields(fields)
+    def cardReq = new ProcessCardReq()
+    cardReq.setRequestID(UUID.randomUUID().toString())
+
+    def cardPacket = new CardPacket()
+    cardPacket.setMethod(0)
+    cardPacket.setProcesses(List.of(UUID.randomUUID().toString())) //todo random?!?
+
+    def pCardReq = new PCardReq()
+    pCardReq.setExternalID(subject.idHolder)
+    pCardReq.setDocTypeID(UUID.randomUUID().toString())
+    // todo random?? "Передавать значение = Акт технического осмотра"
 
     //выгрузка файлов
-    List<Files> files = new ArrayList<>()
+    List<Files> prepareFiles = new ArrayList<>()
 
     def filesData = utils.files(subject)
     if (filesData) {
@@ -554,40 +611,58 @@ private ProcessCardReq prepareRequestToSed() {
         }
     }
 
+    pCardReq.setFiles(prepareFiles) //add Files card //todo random?!?
+
     def section = new Sections()
-    section.setDocumentCommonInfo(docComInfo)
-    section.setFiles(files)
 
-    def pReqCard = new PCardReq()
-//        pReqCard.setId()  todo null
-//        pReqCard.setExternalID()  todo null
-//        pReqCard.setTypeID()  todo null
-    pReqCard.setDocTypeID(UUID.randomUUID().toString())
-    //todo for test Передавать значение = Акт технического осмотра !!! УТОЧНИТЬ
-    pReqCard.setSections(section)
+    def documentCommonInfo = new DocumentCommonInfo()
+    def fieldsDocumentCommonInfo = new FieldsDocumentCommonInfo()
+    fieldsDocumentCommonInfo.setAuthorID(user.idHolder)
+    def docDate = formatInstantNowToString(Instant.now(), true)
+    fieldsDocumentCommonInfo.setDocDate(docDate)
+    fieldsDocumentCommonInfo.setSubject(String.format("Акт технического осмотра по заявке %s от %s", 123, docDate))
+    //todo номер заявки
+    documentCommonInfo.setFields(fieldsDocumentCommonInfo)
 
-    def process = new Processes()
-    process.setProcessID(UUID.randomUUID().toString()) //todo for test
-//    process.setStageTemplateID()  todo null
-//    process.setRoleID() todo null
-//    process.setFdCustomParticipants() todo null
+    def gptDocumentCommonInfo = new GptDocumentCommonInfo()
+    def fieldsGptDocumentCommonInfo = new FieldsGptDocumentCommonInfo()
+    fieldsGptDocumentCommonInfo.setMediaTypeID(UUID.randomUUID().toString())
+// todo random?? "Передавать значение = Электронный"
+    fieldsGptDocumentCommonInfo.setIncomingDate(docDate)
+    gptDocumentCommonInfo.setFields(fieldsGptDocumentCommonInfo)
 
-    def cardPackets = new CardPacket()
-    cardPackets.setMethod(0)
-    cardPackets.setProcesses(List.of(process)) //todo !!!!уточнить структуру в дальнейшем
-    cardPackets.setCard(pReqCard)
+    GptFiles gptFiles = new GptFiles()
+    def collect = prepareFiles.collect { it ->
+        RowsFieldsGptFiles rowsFieldsGptFiles = new RowsFieldsGptFiles()
+        rowsFieldsGptFiles.setAttachmentTypeID(UUID.randomUUID().toString())//todo random?? "Передавать значение = Проект"
+        rowsFieldsGptFiles.setID(it.getId())
 
-    def obj = new ProcessCardReq()
-    obj.setRequestID(UUID.randomUUID().toString())
-    obj.setCardPackets(List.of(cardPackets))
-    return obj
+        return rowsFieldsGptFiles
+    }
+
+    if (collect.size() > 0) {
+        gptFiles.setRows(collect)
+        gptFiles.setTable(1)
+    } else {
+        gptFiles.setTable(0)
+    }
+
+    section.setDocumentCommonInfo(documentCommonInfo) // add  DocumentCommonInfo
+    section.setGptDocumentCommonInfo(gptDocumentCommonInfo) // add  GptDocumentCommonInfo
+    section.setGptFiles(gptFiles) // add  GptFiles
+    pCardReq.setSections(section) // add Section
+
+    cardPacket.setCard(pCardReq) //add PCardReq card
+    cardReq.setCardPackets(List.of(cardPacket)) //add List<CardPacket> cardPackets
+
+    return cardReq
 }
 
 
 /**
  * Загрузка данных в NSD
  */
-private boolean loadResponseToNSD(ProcessCardResp response) {
+private boolean loadResponseToNSD(ProcessCardResp response, String host) {
 
     def obj = subject
 
@@ -610,6 +685,10 @@ private boolean loadResponseToNSD(ProcessCardResp response) {
             Map<Object, Object> updateData = new HashMap<>()
             updateData.put("docActID", prCard.getID())
             updateData.put("barcode", prCard.getBarcode())
+
+            def linkDock = host + "/card" + prCard.getID()
+            updateData.put("docActLink", linkDock)
+
             def closure = {
                 utils.edit(obj.UUID, updateData)
             }
@@ -624,13 +703,24 @@ private boolean loadResponseToNSD(ProcessCardResp response) {
 
 
 /**
+ * Форматирования Instant в Строку
+ */
+private static String formatInstantNowToString(Instant instant, boolean onlyDate) {
+    String PATTERN_FORMAT = "yyyy-MM-dd";
+    DateTimeFormatter formatter = DateTimeFormatter.ofPattern(PATTERN_FORMAT).withZone(ZoneId.systemDefault());
+
+    return onlyDate ? formatter.format(instant) + "T" : instant.toString();
+}
+
+
+/**
  * ====================  ENTRY POINT  ====================
  */
 
 prepareConnect()
 def connect = (HttpURLConnection) new URL(URL).openConnection()
-//String data = objToJson(ProcessCardReq.prapareStaticData()) //todo test
-String data = objToJson(prepareRequestToSed()) //todo main object
+String data = objToJson(ProcessCardReq.prepareStaticData()) //todo test
+//String data = objToJson(prepareRequestToSed()) //todo main object
 prepareRequestPOST(connect, data)
 
 if (connect.responseCode == 200) {
@@ -641,7 +731,7 @@ if (connect.responseCode == 200) {
     def infoText = "${LOG_PREFIX} Получен ответ от СЭД, requestID: ${response.getRequestID()}, код: ${connect?.responseCode}"
     logger.info(infoText)
 
-    if (loadResponseToNSD(response)) {
+    if (loadResponseToNSD(response, HOST_DOCK)) {
         infoText = "${LOG_PREFIX} Данные загружены в NSD, requestID: ${response.getRequestID()}"
         logger.info(infoText)
     } else {
