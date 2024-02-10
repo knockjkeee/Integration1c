@@ -16,13 +16,32 @@ import java.time.format.DateTimeFormatter
 @Field final JsonSlurperClassic json = new JsonSlurperClassic()
 @Field final String LOG_PREFIX = "[INTEGRATION: SED] "
 
-String HOST_API = "http://localhost/exec-post/"
-String HOST_DOCK = "https://tessa-test/"
-String METHOD = 'Integration/ProcessCards'
+def root = utils.get('root', [:])
 
+/**
+ * Поля для Компании (root)
+ * HOSTAPI - хост сервера
+ * HOSTMETHOD - метод Rest
+ * ProcessesID - ID запускаемого процесса
+ * DocTypeID - ID типа документа
+ * CategoryID - CategoryID
+ * MediaTypeID - Носитель оригинала
+ * AttachmentType - Тип вложения
+ */
+
+
+/**
+ * Поля для КЕ обьект Оборудование (ci)
+ * docActID - ID карточки в СЭД
+ * barcode - Штрих-код карточки документа
+ * docActLink - «Акт осмотра» - ссылка
+ */
+
+//String HOST_API = "http://192.168.241.183/exec-post/"
+//String METHOD = 'Integration/ProcessCards'
+String HOST_API = root.HOSTAPI
+String METHOD = root.HOSTMETHOD
 String URL = HOST_API + METHOD
-//String URL = "http://localhost/exec-post/Integration/ProcessCards"
-
 
 /**
  * ====================  REQUEST OBJECT ====================
@@ -569,7 +588,7 @@ private String objToJson(Object obj) {
 /**
  * Добавление файла из БД к обьекту ответа
  */
-def addFilesToRequest(ArrayList<Files> files, obj) {
+def addFilesToRequest(ArrayList<Files> files, obj, def root) {
     if (obj != null) {
         byte[] data = utils.readFileContent(obj)
         def encode = Base64.encoder.encode(data)
@@ -578,6 +597,7 @@ def addFilesToRequest(ArrayList<Files> files, obj) {
         file.setId(obj.UUID)
         file.setName(obj.title)
         file.setContent(content)
+        file.setCategoryID(root.CategoryID)
         file.setMethod(0)
         files.add(file)
     }
@@ -587,23 +607,21 @@ def addFilesToRequest(ArrayList<Files> files, obj) {
 /**
  * Выгрузка данных из NSD
  */
-private ProcessCardReq prepareRequestToSed() {
+private ProcessCardReq prepareRequestToSed(def root) {
 
     def cardReq = new ProcessCardReq()
     cardReq.setRequestID(UUID.randomUUID().toString())
 
     def cardPacket = new CardPacket()
     cardPacket.setMethod(0)
-    cardPacket.setProcesses(List.of(UUID.randomUUID().toString())) //todo random?!?
+    cardPacket.setProcesses(List.of(root.ProcessesID))
 
     def pCardReq = new PCardReq()
     pCardReq.setExternalID(subject.idHolder)
-    pCardReq.setDocTypeID(UUID.randomUUID().toString())
-    // todo random?? "Передавать значение = Акт технического осмотра"
+    pCardReq.setDocTypeID(root.DocTypeID)
 
     //выгрузка файлов
     List<Files> prepareFiles = new ArrayList<>()
-
     def filesData = utils.files(subject)
     if (filesData) {
         filesData.each { it ->
@@ -611,7 +629,7 @@ private ProcessCardReq prepareRequestToSed() {
         }
     }
 
-    pCardReq.setFiles(prepareFiles) //add Files card //todo random?!?
+    pCardReq.setFiles(prepareFiles)
 
     def section = new Sections()
 
@@ -620,23 +638,20 @@ private ProcessCardReq prepareRequestToSed() {
     fieldsDocumentCommonInfo.setAuthorID(user.idHolder)
     def docDate = formatInstantNowToString(Instant.now(), true)
     fieldsDocumentCommonInfo.setDocDate(docDate)
-    fieldsDocumentCommonInfo.setSubject(String.format("Акт технического осмотра по заявке %s от %s", 123, docDate))
-    //todo номер заявки
+    fieldsDocumentCommonInfo.setSubject(String.format("Акт технического осмотра по заявке %s от %s", subject.calls.number, docDate))
     documentCommonInfo.setFields(fieldsDocumentCommonInfo)
 
     def gptDocumentCommonInfo = new GptDocumentCommonInfo()
     def fieldsGptDocumentCommonInfo = new FieldsGptDocumentCommonInfo()
-    fieldsGptDocumentCommonInfo.setMediaTypeID(UUID.randomUUID().toString())
-// todo random?? "Передавать значение = Электронный"
+    fieldsGptDocumentCommonInfo.setMediaTypeID(root.MediaTypeID)
     fieldsGptDocumentCommonInfo.setIncomingDate(docDate)
     gptDocumentCommonInfo.setFields(fieldsGptDocumentCommonInfo)
 
     GptFiles gptFiles = new GptFiles()
     def collect = prepareFiles.collect { it ->
         RowsFieldsGptFiles rowsFieldsGptFiles = new RowsFieldsGptFiles()
-        rowsFieldsGptFiles.setAttachmentTypeID(UUID.randomUUID().toString())//todo random?? "Передавать значение = Проект"
+        rowsFieldsGptFiles.setAttachmentTypeID(root.AttachmentType)
         rowsFieldsGptFiles.setID(it.getId())
-
         return rowsFieldsGptFiles
     }
 
@@ -647,13 +662,13 @@ private ProcessCardReq prepareRequestToSed() {
         gptFiles.setTable(0)
     }
 
-    section.setDocumentCommonInfo(documentCommonInfo) // add  DocumentCommonInfo
-    section.setGptDocumentCommonInfo(gptDocumentCommonInfo) // add  GptDocumentCommonInfo
-    section.setGptFiles(gptFiles) // add  GptFiles
-    pCardReq.setSections(section) // add Section
+    section.setDocumentCommonInfo(documentCommonInfo)
+    section.setGptDocumentCommonInfo(gptDocumentCommonInfo)
+    section.setGptFiles(gptFiles)
+    pCardReq.setSections(section)
 
-    cardPacket.setCard(pCardReq) //add PCardReq card
-    cardReq.setCardPackets(List.of(cardPacket)) //add List<CardPacket> cardPackets
+    cardPacket.setCard(pCardReq)
+    cardReq.setCardPackets(List.of(cardPacket))
 
     return cardReq
 }
@@ -719,8 +734,8 @@ private static String formatInstantNowToString(Instant instant, boolean onlyDate
 
 prepareConnect()
 def connect = (HttpURLConnection) new URL(URL).openConnection()
-String data = objToJson(ProcessCardReq.prepareStaticData()) //todo test
-//String data = objToJson(prepareRequestToSed()) //todo main object
+//String data = objToJson(ProcessCardReq.prepareStaticData(root)) //todo test
+String data = objToJson(prepareRequestToSed(root)) //todo main object
 prepareRequestPOST(connect, data)
 
 if (connect.responseCode == 200) {
@@ -731,7 +746,7 @@ if (connect.responseCode == 200) {
     def infoText = "${LOG_PREFIX} Получен ответ от СЭД, requestID: ${response.getRequestID()}, код: ${connect?.responseCode}"
     logger.info(infoText)
 
-    if (loadResponseToNSD(response, HOST_DOCK)) {
+    if (loadResponseToNSD(response, HOST_API)) {
         infoText = "${LOG_PREFIX} Данные загружены в NSD, requestID: ${response.getRequestID()}"
         logger.info(infoText)
     } else {
