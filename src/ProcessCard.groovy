@@ -13,9 +13,51 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+
+/**
+ * ====================  START SCRIPT ====================
+ */
+
+//ibadin
+//upd. pleonov
+
+//Определяем шаблон:
+def template = utils.get('template$2534301').templateFile.UUID[0]
+
+//Формируем мапу с данными:
+def bindings = [:]
+
+bindings.number = cardObject?.number
+bindings.description = cardObject?.descriptionRTF
+bindings.clientEmployee = cardObject?.clientEmployee?.title
+bindings.respEmployee = cardObject?.responsibleEmployee?.title
+bindings.manager = cardObject?.responsibleEmployee?.immediateSupervisor?.title
+
+def cis = params?.ci
+bindings.sn = cis?.sn
+bindings.type = cis?.classification?.title
+bindings.model = cis?.model?.title
+bindings.inventary = cis?.inventary
+bindings.korp = cis?.korp
+bindings.shelf = cis?.shelf
+bindings.stack = cis?.stack
+
+bindings.date = utils.formatters.formatDate(new Date())
+
+bindings.checkRes = params?.checkRes
+bindings.repairRes = params?.repairRes
+
+//создаем файл, прикрепляем к объекту
+def data = utils.processTemplate(template, bindings)
+utils.attachFile(cardObject, 'Название обработанного шаблона.docx', 'unknown', 'описание', data)
+
+
+/**
+ * ====================  UPDATE SCRIPT ====================
+ */
+
 @Field final JsonSlurperClassic json = new JsonSlurperClassic()
 @Field final String LOG_PREFIX = "[INTEGRATION: SED] "
-
 def root = utils.get('root', [:])
 
 /**
@@ -37,8 +79,9 @@ def root = utils.get('root', [:])
  * docActLink - «Акт осмотра» - ссылка
  */
 
-//String HOST_API = "http://192.168.241.183/exec-post/"
+//String HOST_API = "http://localhost/exec-post/"
 //String METHOD = 'Integration/ProcessCards'
+//user = true
 String HOST_API = root.HOSTAPI
 String METHOD = root.HOSTMETHOD
 String URL = HOST_API + METHOD
@@ -49,8 +92,8 @@ String URL = HOST_API + METHOD
 
 @JsonPropertyOrder(['RequestID', 'CardPackets'])
 @JsonIgnoreProperties(ignoreUnknown = true)
-/*
- *    Атрибуты запроса карточки документа в СЭД:
+/**
+ *  Атрибуты запроса карточки документа в СЭД:
  */
 class ProcessCardReq {
 
@@ -70,7 +113,6 @@ class ProcessCardReq {
 
     /**
      * Тестовый метод заполнения данных
-     * @return
      */
     static ProcessCardReq prepareStaticData() {
 
@@ -119,11 +161,11 @@ class ProcessCardReq {
         gptFiles.setTable(1) //todo collections
 
         def collect = prepareFiles.collect { it ->
-                RowsFieldsGptFiles rowsFieldsGptFiles = new RowsFieldsGptFiles()
-                rowsFieldsGptFiles.setAttachmentTypeID(UUID.randomUUID().toString())
-                //todo random?? "Передавать значение = Проект"
-                rowsFieldsGptFiles.setID(it.getId())
-                return rowsFieldsGptFiles
+            RowsFieldsGptFiles rowsFieldsGptFiles = new RowsFieldsGptFiles()
+            rowsFieldsGptFiles.setAttachmentTypeID(UUID.randomUUID().toString())
+            //todo random?? "Передавать значение = Проект"
+            rowsFieldsGptFiles.setID(it.getId())
+            return rowsFieldsGptFiles
         }
 
         if (collect.size() > 0) {
@@ -157,8 +199,8 @@ class ProcessCardReq {
 
 @JsonPropertyOrder(['METHOD', 'Processes', 'Card'])
 @JsonIgnoreProperties(ignoreUnknown = true)
-/*
- *    Массив данных Документы
+/**
+ * Массив данных Документы
  */
 class CardPacket {
 
@@ -635,7 +677,7 @@ private ProcessCardReq prepareRequestToSed(def root) {
 
     def documentCommonInfo = new DocumentCommonInfo()
     def fieldsDocumentCommonInfo = new FieldsDocumentCommonInfo()
-    fieldsDocumentCommonInfo.setAuthorID(subject.users.idHolder)
+    fieldsDocumentCommonInfo.setAuthorID(user.idHolder)
     def docDate = formatInstantNowToString(Instant.now(), true)
     fieldsDocumentCommonInfo.setDocDate(docDate)
     fieldsDocumentCommonInfo.setSubject(String.format("Акт технического осмотра по заявке %s от %s", subject.calls.number, docDate))
@@ -732,11 +774,20 @@ private static String formatInstantNowToString(Instant instant, boolean onlyDate
  * ====================  ENTRY POINT  ====================
  */
 
+/**
+ * Проверка на супер пользователя
+ */
+if (!user) {
+    logger.info("${LOG_PREFIX} Нельзя запускать скрипт под супер пользователем")
+    return
+}
+
 prepareConnect()
 def connect = (HttpURLConnection) new URL(URL).openConnection()
-//String data = objToJson(ProcessCardReq.prepareStaticData(root)) //todo test
-String data = objToJson(prepareRequestToSed(root)) //todo main object
-prepareRequestPOST(connect, data)
+//    String data = objToJson(ProcessCardReq.prepareStaticData()) //todo test
+String jsonString = objToJson(prepareRequestToSed(root)) //todo main object
+logger.info("${LOG_PREFIX} Объект зароса сформирован:${jsonString}")
+prepareRequestPOST(connect, jsonString)
 
 if (connect.responseCode == 200) {
     def text = connect.inputStream.text
@@ -758,4 +809,5 @@ if (connect.responseCode == 200) {
     def errorText = "${LOG_PREFIX} Ошибка в запросе при получении ответа от СЭД, код ошибки: ${connect.responseCode}, ошибка: ${connect?.errorStream?.text}"
     logger.error(errorText)
 }
+
 
