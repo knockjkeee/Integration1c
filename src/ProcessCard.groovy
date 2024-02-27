@@ -635,7 +635,7 @@ private ProcessCardReq prepareRequestToSed(def root) {
 
     def documentCommonInfo = new DocumentCommonInfo()
     def fieldsDocumentCommonInfo = new FieldsDocumentCommonInfo()
-    fieldsDocumentCommonInfo.setAuthorID(user.idHolder)
+    fieldsDocumentCommonInfo.setAuthorID(subject.users.idHolder)
     def docDate = formatInstantNowToString(Instant.now(), true)
     fieldsDocumentCommonInfo.setDocDate(docDate)
     fieldsDocumentCommonInfo.setSubject(String.format("Акт технического осмотра по заявке %s от %s", subject.calls.number, docDate))
