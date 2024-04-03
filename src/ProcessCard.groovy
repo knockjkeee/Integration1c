@@ -17,12 +17,13 @@ import java.time.format.DateTimeFormatter
 /**
  * ====================  START SCRIPT ====================
  */
-
+logger.info("SED начало скрипта")
 //ibadin
 //upd. pleonov
 
 //Определяем шаблон:
-def template = utils.get('template$2534301').templateFile.UUID[0]
+def company =  utils.get('root',[:])
+def template = company.templateAct.templateFile.UUID[0]
 
 //Формируем мапу с данными:
 def bindings = [:]
@@ -35,22 +36,33 @@ bindings.manager = cardObject?.responsibleEmployee?.immediateSupervisor?.title
 
 def cis = params?.ci
 bindings.sn = cis?.sn
+bindings.cisTitle = cis?.title
 bindings.type = cis?.classification?.title
 bindings.model = cis?.model?.title
 bindings.inventary = cis?.inventary
+bindings.room = cis?.room
 bindings.korp = cis?.korp
 bindings.shelf = cis?.shelf
 bindings.stack = cis?.stack
 
 bindings.date = utils.formatters.formatDate(new Date())
+bindings.SCdate = utils.formatters.formatDate(cardObject.registrationDate)
 
 bindings.checkRes = params?.checkRes
 bindings.repairRes = params?.repairRes
+bindings.reportedFault = params?.reportedFault
 
 //создаем файл, прикрепляем к объекту
 def data = utils.processTemplate(template, bindings)
-utils.attachFile(cardObject, 'Название обработанного шаблона.docx', 'unknown', 'описание', data)
 
+// обеспечение транзакционности
+def closure = {
+    utils.attachFile(cardObject, company.templateAct.title +"_"+ cardObject.title + ".docx", 'unknown', 'описание', data)
+    utils.attachFile(cis, company.templateAct.title +"_"+ cis.title + ".docx", 'unknown', 'описание', data)
+}
+api.tx.call(closure)
+
+logger.info("SED прикрепили файлы")
 
 /**
  * ====================  UPDATE SCRIPT ====================
@@ -604,7 +616,7 @@ private void prepareConnect() {
 /**
  * Подготовка POST запроса по http
  */
-private def prepareRequestPOST(HttpURLConnection connection, String data) {
+private def prepareRequestPOST(HttpsURLConnection connection, String data) {
     byte[] postData = data.getBytes(Charset.forName("utf-8"))
     connection.setDoOutput(true)
     connection.setInstanceFollowRedirects(false)
@@ -777,7 +789,7 @@ private static String formatInstantNowToString(Instant instant, boolean onlyDate
 /**
  * Проверка на супер пользователя
  */
-if (!user) {
+if (user == null) {
     logger.info("${LOG_PREFIX} Нельзя запускать скрипт под супер пользователем")
     return
 }
