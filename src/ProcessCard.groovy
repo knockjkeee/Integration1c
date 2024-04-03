@@ -13,6 +13,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+@Field final String LOG_PREFIX = "[INTEGRATION: SED] "
 
 /**
  * ====================  START SCRIPT ====================
@@ -21,8 +22,18 @@ logger.info("SED начало скрипта")
 //ibadin
 //upd. pleonov
 
+
+/**
+ * Проверка на супер пользователя
+ */
+if (user == null) {
+    def msg = "${LOG_PREFIX} Нельзя запускать скрипт под суперпользователем"
+    logger.info(msg)
+    return utils.throwUiReadableException(msg, "")
+}
+
 //Определяем шаблон:
-def company =  utils.get('root',[:])
+def company = utils.get('root', [:])
 def template = company.templateAct.templateFile.UUID[0]
 
 //Формируем мапу с данными:
@@ -55,10 +66,11 @@ bindings.reportedFault = params?.reportedFault
 //создаем файл, прикрепляем к объекту
 def data = utils.processTemplate(template, bindings)
 
+def attachedFile = null
 // обеспечение транзакционности
 def closure = {
-    utils.attachFile(cardObject, company.templateAct.title +"_"+ cardObject.title + ".docx", 'unknown', 'описание', data)
-    utils.attachFile(cis, company.templateAct.title +"_"+ cis.title + ".docx", 'unknown', 'описание', data)
+    attachedFile = utils.attachFile(cardObject, company.templateAct.title + "_" + cardObject.title + ".docx", 'unknown', 'описание', data)
+    utils.attachFile(cis, company.templateAct.title + "_" + cis.title + ".docx", 'unknown', 'описание', data)
 }
 api.tx.call(closure)
 
@@ -69,7 +81,6 @@ logger.info("SED прикрепили файлы")
  */
 
 @Field final JsonSlurperClassic json = new JsonSlurperClassic()
-@Field final String LOG_PREFIX = "[INTEGRATION: SED] "
 def root = utils.get('root', [:])
 
 /**
@@ -640,16 +651,16 @@ private String objToJson(Object obj) {
 
 
 /**
- * Добавление файла из БД к обьекту ответа
+ * Добавление файла из БД
  */
-def addFilesToRequest(ArrayList<Files> files, obj, def root) {
-    if (obj != null) {
-        byte[] data = utils.readFileContent(obj)
+def addFilesToRequest(ArrayList<Files> files, def attachedFile, def root) {
+    if (attachedFile != null) {
+        byte[] data = utils.readFileContent(attachedFile)
         def encode = Base64.encoder.encode(data)
         def content = new String(encode)
         Files file = new Files()
-        file.setId(obj.UUID)
-        file.setName(obj.title)
+        file.setId(attachedFile.UUID)
+        file.setName(attachedFile.title)
         file.setContent(content)
         file.setCategoryID(root.CategoryID)
         file.setMethod(0)
@@ -661,7 +672,7 @@ def addFilesToRequest(ArrayList<Files> files, obj, def root) {
 /**
  * Выгрузка данных из NSD
  */
-private ProcessCardReq prepareRequestToSed(def root) {
+private ProcessCardReq prepareRequestToSed(def root, def attachedFile) {
 
     def cardReq = new ProcessCardReq()
     cardReq.setRequestID(UUID.randomUUID().toString())
@@ -676,12 +687,7 @@ private ProcessCardReq prepareRequestToSed(def root) {
 
     //выгрузка файлов
     List<Files> prepareFiles = new ArrayList<>()
-    def filesData = utils.files(subject)
-    if (filesData) {
-        filesData.each { it ->
-            addFilesToRequest(files, it)
-        }
-    }
+    addFilesToRequest(prepareFiles, attachedFile, root)
 
     pCardReq.setFiles(prepareFiles)
 
@@ -786,18 +792,10 @@ private static String formatInstantNowToString(Instant instant, boolean onlyDate
  * ====================  ENTRY POINT  ====================
  */
 
-/**
- * Проверка на супер пользователя
- */
-if (user == null) {
-    logger.info("${LOG_PREFIX} Нельзя запускать скрипт под супер пользователем")
-    return
-}
-
 prepareConnect()
 def connect = (HttpURLConnection) new URL(URL).openConnection()
 //    String data = objToJson(ProcessCardReq.prepareStaticData()) //todo test
-String jsonString = objToJson(prepareRequestToSed(root)) //todo main object
+String jsonString = objToJson(prepareRequestToSed(root, attachedFile)) //todo main object
 logger.info("${LOG_PREFIX} Объект зароса сформирован:${jsonString}")
 prepareRequestPOST(connect, jsonString)
 
