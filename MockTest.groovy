@@ -25,66 +25,66 @@ logger.info("SED начало скрипта")
 //ibadin
 //upd. pleonov
 
-
-/**
- * Проверка на супер пользователя
- */
-if (user == null) {
-    def msg = "${LOG_PREFIX} Нельзя запускать скрипт под суперпользователем"
-    logger.info(msg)
-    return utils.throwUiReadableException(msg, "")
-}
-
-//Определяем шаблон:
-def company = utils.get('root', [:])
-def template = company.templateAct.templateFile.UUID[0]
-
-//Формируем мапу с данными:
-def bindings = [:]
-
-bindings.number = cardObject?.number
-bindings.description = cardObject?.descriptionRTF
-bindings.clientEmployee = cardObject?.clientEmployee?.title
-bindings.respEmployee = cardObject?.responsibleEmployee?.title
-bindings.manager = cardObject?.responsibleEmployee?.immediateSupervisor?.title
-
-def cis = params?.ci
-bindings.sn = cis?.sn
-bindings.cisTitle = cis?.title
-bindings.type = cis?.classification?.title
-bindings.model = cis?.model?.title
-bindings.inventary = cis?.inventary
-bindings.room = cis?.room
-bindings.korp = cis?.korp
-bindings.shelf = cis?.shelf
-bindings.stack = cis?.stack
-
-bindings.date = utils.formatters.formatDate(new Date())
-bindings.SCdate = utils.formatters.formatDate(cardObject.registrationDate)
-
-bindings.checkRes = params?.checkRes
-bindings.repairRes = params?.repairRes
-bindings.reportedFault = params?.reportedFault
-
-//создаем файл, прикрепляем к объекту
-def data = utils.processTemplate(template, bindings)
-
-def attachedFile = null
-// обеспечение транзакционности
-def closure = {
-    attachedFile = utils.attachFile(cardObject, company.templateAct.title + "_" + cardObject.title + ".docx", 'unknown', 'описание', data)
-    utils.attachFile(cis, company.templateAct.title + "_" + cis.title + ".docx", 'unknown', 'описание', data)
-}
-api.tx.call(closure)
-
-logger.info("SED прикрепили файлы")
+//
+///**
+// * Проверка на суперпользователя
+// */
+//if (user == null) {
+//    def msg = "${LOG_PREFIX} Нельзя запускать скрипт под суперпользователем"
+//    logger.info(msg)
+//    return utils.throwUiReadableException(msg, "")
+//}
+//
+////Определяем шаблон:
+//def company = utils.get('root', [:])
+//def template = company.templateAct.templateFile.UUID[0]
+//
+////Формируем мапу с данными:
+//def bindings = [:]
+//
+//bindings.number = cardObject?.number
+//bindings.description = cardObject?.descriptionRTF
+//bindings.clientEmployee = cardObject?.clientEmployee?.title
+//bindings.respEmployee = cardObject?.responsibleEmployee?.title
+//bindings.manager = cardObject?.responsibleEmployee?.immediateSupervisor?.title
+//
+//def cis = params?.ci
+//bindings.sn = cis?.sn
+//bindings.cisTitle = cis?.title
+//bindings.type = cis?.classification?.title
+//bindings.model = cis?.model?.title
+//bindings.inventary = cis?.inventary
+//bindings.room = cis?.room
+//bindings.korp = cis?.korp
+//bindings.shelf = cis?.shelf
+//bindings.stack = cis?.stack
+//
+//bindings.date = utils.formatters.formatDate(new Date())
+//bindings.SCdate = utils.formatters.formatDate(cardObject.registrationDate)
+//
+//bindings.checkRes = params?.checkRes
+//bindings.repairRes = params?.repairRes
+//bindings.reportedFault = params?.reportedFault
+//
+////создаем файл, прикрепляем к объекту
+//def data = utils.processTemplate(template, bindings)
+//
+//def attachedFile = null
+//// обеспечение транзакционности
+//def closure = {
+//    attachedFile = utils.attachFile(cardObject, company.templateAct.title + "_" + cardObject.title + ".docx", 'unknown', 'описание', data)
+//    utils.attachFile(cis, company.templateAct.title + "_" + cis.title + ".docx", 'unknown', 'описание', data)
+//}
+//api.tx.call(closure)
+//
+//logger.info("SED прикрепили файлы")
 
 /**
  * ====================  UPDATE SCRIPT ====================
  */
 
 @Field final JsonSlurperClassic json = new JsonSlurperClassic()
-def root = utils.get('root', [:])
+def root = utils.get('root', [:]) //todo
 
 /**
  * Поля для Компании (root)
@@ -105,7 +105,7 @@ def root = utils.get('root', [:])
  * docActLink - «Акт осмотра» - ссылка
  */
 
-//String HOST_API = "http://localhost/exec-post/"
+//String HOST_API = "http://192.168.241.12/exec-post/"
 //String METHOD = 'Integration/ProcessCards'
 //user = true
 String HOST_API = root.HOSTAPI
@@ -798,7 +798,7 @@ private static String formatInstantNowToString(Instant instant, boolean onlyDate
 prepareConnect()
 def connect = (HttpURLConnection) new URL(URL).openConnection()
 //    String data = objToJson(ProcessCardReq.prepareStaticData()) //todo test
-String jsonString = objToJson(prepareRequestToSed(root, attachedFile)) //todo main object
+String jsonString = '{"RequestID":"b7da33e1-5a9c-430f-83c3-3835041d3e55","CardPackets":[{"Card":{"ExternalID":"8c9eff07-3c94-41a2-afb0-f5ee0d8f8ese","DocTypeID":"7f431b89-5e33-48ea-8d2f-2010f70adc41","Sections":{"GptDocumentCommonInfo":{"Fields":{"ExecutionDate":"2023-12-28T21:00:00Z","PreparationTime":"2024-01-01T21:00:00Z","BranchID":"bd7fd759-c373-4467-83c0-b2e853f3fe9e","MediaTypeID":"040e0517-7e0c-446e-b63e-9f032c4fbfc5"}},"DocumentCommonInfo":{"Fields":{"Subject":"57777777777777777"}},"GptSignedBy":{"table":1,"Rows":[{"UserID":"1c22997d-9cb3-40e3-b454-5d92c377b632"}]},"GptAddressee":{"table":1,"Rows":[{"EmployeeID":"1c22997d-9cb3-40e3-b454-5d92c377b632"}]}}},"Method":0}]}'  /*objToJson(prepareRequestToSed(root, attachedFile)) //todo main object*/
 logger.info("${LOG_PREFIX} Объект зароса сформирован:${jsonString}")
 prepareRequestPOST(connect, jsonString)
 
@@ -810,22 +810,18 @@ if (connect.responseCode == 200) {
     response.initMaps()
 
     def infoText = "${LOG_PREFIX} Получен ответ от СЭД, requestID: ${response.getRequestID()}, код: ${connect?.responseCode}"
-
     logger.info(infoText)
-
     logger.info("${LOG_PREFIX} Ответ - ${objToJson(response)}")
 
-    if (loadResponseToNSD(response, HOST_API)) {
-        infoText = "${LOG_PREFIX} Данные загружены в NSD, requestID: ${response.getRequestID()}"
-        logger.info(infoText)
-    } else {
-        def errorText = "${LOG_PREFIX} Данные не загружены в NSD, requestID: ${response.getRequestID()}"
-        logger.error(errorText)
-    }
+//    if (loadResponseToNSD(response, HOST_API)) {
+//        infoText = "${LOG_PREFIX} Данные загружены в NSD, requestID: ${response.getRequestID()}"
+//        logger.info(infoText)
+//    } else {
+//        def errorText = "${LOG_PREFIX} Данные не загружены в NSD, requestID: ${response.getRequestID()}"
+//        logger.error(errorText)
+//    }
 
 } else {
     def errorText = "${LOG_PREFIX} Ошибка в запросе при получении ответа от СЭД, код ошибки: ${connect.responseCode}, ошибка: ${connect?.errorStream?.text}"
     logger.error(errorText)
 }
-
-
