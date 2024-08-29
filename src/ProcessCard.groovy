@@ -575,7 +575,7 @@ class RowsFieldsGptFiles {
  * ====================  RESPONSE OBJECT ====================
  */
 
-@JsonPropertyOrder(['RequestID', 'Events', 'Cards'])
+@JsonPropertyOrder(['RequestID', 'Events', 'Cards', 'ElapsedTime', 'RawCards'])
 @JsonIgnoreProperties(ignoreUnknown = true)
 /**
  * Атрибуты ответа карточки документа от СЭД:
@@ -594,6 +594,10 @@ class ProcessCardResp {
     List<Event> Events
 
     List<PRespCard> Cards
+
+    List<Object> RawCards
+
+    String ElapsedTime
 
 
     private void updateEvents() {
@@ -699,6 +703,12 @@ class PRespCard {
      * При создании карточки, СЭД генерирует штрих-код документа и возвращает его в запросе
      */
     String Barcode
+
+
+    public boolean isExist() {
+        return ID != null && ExternalID != null && Barcode != null;
+    }
+
 }
 
 
@@ -857,28 +867,43 @@ private boolean loadResponseToNSD(ProcessCardResp response, String host) {
     boolean isFail = false;
     def cards = response.getCards()
 
+    if (cards == null || cards.size() == 0) {
+        logger.info("${LOG_PREFIX} Обьект ответа вернулся пустой, RequestID ${response.getRequestID()}")
+        return false
+    }
+
     response.getEvents().eachWithIndex { event, index ->
         String log = "${LOG_PREFIX} ${event.getTimeStamp()}, Messsage - ${event.getMessage()}, StackTrace - ${event.getStackTrace()}"
 
         if (event.getEventType() == 0) {
             logger.error(log)
             isFail = true
-        } else {
-            def prCard = cards.get(index)
+        }
+    }
+
+    def prCard = cards[0]
+
+    if (!isFail) {
+        if (prCard.isExist()) {
             Map<Object, Object> updateData = new HashMap<>()
             updateData.put("docActID", prCard.getID())
             updateData.put("barcode", prCard.getBarcode())
 
-            def linkDock = host + "/card" + prCard.getID()
+            def linkDock = host + "card/" + prCard.getID()
             updateData.put("docActLink", linkDock)
 
             def closure = {
                 utils.edit(obj.UUID, updateData)
             }
             api.tx.call(closure)
+
             log = "${LOG_PREFIX} Обьект Dock обновлен, ID записи: ${prCard.getExternalID()}"
             logger.info(log)
+
             isFail = false
+        } else {
+            logger.info("${LOG_PREFIX} Обьект ответа вернулся не заполенный, RequestID ${response.getRequestID()}")
+            isFail = true
         }
     }
     return !isFail;
@@ -894,7 +919,7 @@ private static String formatInstantNowToStringDateTime(Instant instant, boolean 
     return usePattern ? formatter.format(instant) : instant.toString();
 }
 
-private static String formatDateToStringDate(Date date){
+private static String formatDateToStringDate(Date date) {
     if (date == null) return null
     return date.format("dd.MM.yyyy")
 }
